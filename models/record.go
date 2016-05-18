@@ -15,7 +15,7 @@ type Record struct {
 	CallerGender  string `orm:form:"caller_gender" `
 	CallerId      string `orm:form:"caller_id" `
 	CalleeId      string `orm:form:"callee_id" `
-	RecordType    int    `orm:form:"type" `
+	RecordType    int    `orm:form:"record_type" `
 
 	//	StartTime Time
 	//	EndTime   Time
@@ -33,6 +33,7 @@ func AddRecord(r *Record) (int, error) {
 	record.CallerAddress = r.CallerAddress
 	record.CallerGender = r.CallerGender
 	record.CalleeId = r.CalleeId
+	record.CallerId = r.CallerId
 
 	record.RecordType = r.RecordType
 

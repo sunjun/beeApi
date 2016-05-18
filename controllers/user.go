@@ -1,8 +1,8 @@
 package controllers
 
 import (
-	"github.com/sunjun/videoapi/models"
 	"encoding/json"
+	"github.com/sunjun/videoapi/models"
 
 	"github.com/astaxie/beego"
 )

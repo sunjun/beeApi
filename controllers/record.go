@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
+
 	"github.com/astaxie/beego"
 	"github.com/sunjun/videoapi/models"
 )
@@ -12,6 +14,11 @@ const (
 	START_SERVICE
 	STOP_SERVICE
 )
+
+type Response struct {
+	Status string `json:"status"`
+	Info   string `json:"info"`
+}
 
 type RecordController struct {
 	beego.Controller
@@ -32,9 +39,8 @@ func (r *RecordController) Post() {
 }
 
 func return_error(r *RecordController, err error) {
-	r.Data["status"] = "fail"
-	//	r.Data["info"] = err.Error()
-	r.Data["info"] = "error"
+	res := &Response{"fail", "error"}
+	r.Data["json"] = res
 	r.ServeJSON()
 	return
 }
@@ -46,14 +52,18 @@ func return_error(r *RecordController, err error) {
 // @Failure 403 user not exist
 // @router /login [post]
 func (r *RecordController) Login() {
+
 	var record models.Record
 	err := json.Unmarshal(r.Ctx.Input.RequestBody, &record)
+
+	fmt.Printf("%+v\n", record)
 	if err == nil {
 		record.RecordType = LOG_IN
-		id, err := models.AddRecord(&record)
+		uid, err := models.AddRecord(&record)
 		if err == nil {
-			r.Data["status"] = "success"
-			r.Data["info"] = id
+			res := &Response{"success", "1"}
+			r.Data["json"] = res
+			fmt.Printf("%d\n", uid)
 			r.ServeJSON()
 			return
 		}
