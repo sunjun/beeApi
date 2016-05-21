@@ -76,6 +76,13 @@ func init() {
 			[]string{"get"},
 			nil})
 
+	beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:ServiceController"] = append(beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:ServiceController"],
+		beego.ControllerComments{
+			"List",
+			`/list`,
+			[]string{"get"},
+			nil})
+
 	beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"] = append(beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"],
 		beego.ControllerComments{
 			"Post",

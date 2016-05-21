@@ -20,6 +20,11 @@ func init() {
 				&controllers.ObjectController{},
 			),
 		),
+		beego.NSNamespace("/service",
+			beego.NSInclude(
+				&controllers.ServiceController{},
+			),
+		),
 		beego.NSNamespace("/record",
 			beego.NSInclude(
 				&controllers.RecordController{},
