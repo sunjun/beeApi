@@ -57,6 +57,13 @@ func init() {
 
 	beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:RecordController"] = append(beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:RecordController"],
 		beego.ControllerComments{
+			"ServiceList",
+			`/service_list`,
+			[]string{"get"},
+			nil})
+
+	beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:RecordController"] = append(beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:RecordController"],
+		beego.ControllerComments{
 			"Logout",
 			`/logout`,
 			[]string{"get"},
