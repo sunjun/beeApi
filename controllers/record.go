@@ -3,14 +3,17 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/astaxie/beego"
 	"github.com/sunjun/videoapi/models"
 )
 
 const (
-	LOG_IN = iota
-	LOG_OUT
+	CALLER_LOG_IN = iota
+	CALLER_LOG_OUT
+	CALLEE_LOG_IN
+	CALLEE_LOG_OUT
 	START_SERVICE
 	STOP_SERVICE
 )
@@ -62,23 +65,49 @@ func return_error(r *RecordController, err error) {
 	return
 }
 
-// @Title login
+// @Title CalleeLogin
 // @Description Logs user into the system
 // @Param	body		body 	models.Record	true		"body for user login content"
 // @Success 200 {string} login success
 // @Failure 403 user not exist
-// @router /login [post]
-func (r *RecordController) Login() {
+// @router /caller_login [post]
+func (r *RecordController) CalleeLogin() {
 
 	var record models.Record
 	err := json.Unmarshal(r.Ctx.Input.RequestBody, &record)
 
 	fmt.Printf("%+v\n", record)
 	if err == nil {
-		record.RecordType = LOG_IN
+		record.RecordType = CALLEE_LOG_IN
 		uid, err := models.AddRecord(&record)
 		if err == nil {
-			res := &Response{Status: "success", Info: "1"}
+			res := &Response{Status: "success", Info: strconv.Itoa(uid)}
+			r.Data["json"] = res
+			fmt.Printf("%d\n", uid)
+			r.ServeJSON()
+			return
+		}
+	}
+	return_error(r, err)
+}
+
+// @Title CallerLogin
+// @Description Logs user into the system
+// @Param	body		body 	models.Record	true		"body for user login content"
+// @Success 200 {string} login success
+// @Failure 403 user not exist
+// @router /caller_login [post]
+func (r *RecordController) CallerLogin() {
+
+	var record models.Record
+	err := json.Unmarshal(r.Ctx.Input.RequestBody, &record)
+
+	fmt.Printf("%+v\n", record)
+	if err == nil {
+		record.RecordType = CALLER_LOG_IN
+		uid, err := models.AddRecord(&record)
+		if err == nil {
+			res := &Response{Status: "success", Info: strconv.Itoa(uid)}
 			r.Data["json"] = res
 			fmt.Printf("%d\n", uid)
 			r.ServeJSON()

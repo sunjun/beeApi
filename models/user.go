@@ -2,18 +2,29 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/astaxie/beego/orm"
 )
 
 var (
 	UserList map[string]*User
 )
 
-func init() {
-	UserList = make(map[string]*User)
-	u := User{"user_11111", "astaxie", "11111", Profile{"male", 20, "Singapore", "astaxie@gmail.com"}}
-	UserList["user_11111"] = &u
+type CallerUser struct {
+	Id       int
+	IdNumber string    `orm:form:"id_number"`
+	Name     string    `orm:form:"name"`
+	Address  string    `orm:form:"addres"`
+	Gender   string    `orm:form:"gender"`
+	AddTime  time.Time `orm:form:"add_time"`
+}
+
+type CalleeUser struct {
+	Id       int
+	Password string
 }
 
 type User struct {
@@ -28,6 +39,13 @@ type Profile struct {
 	Age     int
 	Address string
 	Email   string
+}
+
+func init() {
+	UserList = make(map[string]*User)
+	u := User{"user_11111", "astaxie", "11111", Profile{"male", 20, "Singapore", "astaxie@gmail.com"}}
+	UserList["user_11111"] = &u
+	orm.RegisterModel(new(CallerUser))
 }
 
 func AddUser(u User) string {
@@ -83,4 +101,31 @@ func Login(username, password string) bool {
 
 func DeleteUser(uid string) {
 	delete(UserList, uid)
+}
+
+func CalleeLogin(id int, password string) (int, error) {
+	fmt.Println(id, password)
+	if id != 123 && password != "123456" {
+		return -1, errors.New("用户名密码不正确")
+	}
+
+	return 0, nil
+}
+
+func AddCallerUser(c *CallerUser) (int, error) {
+	o := orm.NewOrm()
+	caller := new(CallerUser)
+	caller.IdNumber = c.IdNumber
+	caller.Name = c.Name
+	caller.Address = c.Address
+	caller.Gender = c.Gender
+	caller.AddTime = time.Now()
+
+	fmt.Printf("%+v\n", caller)
+
+	id, err := o.Insert(caller)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return int(id), err
 }

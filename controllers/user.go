@@ -2,14 +2,30 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
+	"strconv"
+
 	"github.com/sunjun/videoapi/models"
 
 	"github.com/astaxie/beego"
 )
 
+//response json
+type response struct {
+	Status string `json:"status"`
+	Info   string `json:"info"`
+}
+
 // Operations about Users
 type UserController struct {
 	beego.Controller
+}
+
+func u_return_error(u *UserController, err error) {
+	res := &response{Status: "fail", Info: "error"}
+	u.Data["json"] = res
+	u.ServeJSON()
+	return
 }
 
 // @Title createUser
@@ -115,4 +131,54 @@ func (u *UserController) Login() {
 func (u *UserController) Logout() {
 	u.Data["json"] = "logout success"
 	u.ServeJSON()
+}
+
+// @Title callee login
+// @Description Logs user into the system
+// @Param	username		query 	string	true		"The username for login"
+// @Param	password		query 	string	true		"The password for login"
+// @Success 200 {string} login success
+// @Failure 403 user not exist
+// @router /callee_login [post]
+func (u *UserController) CalleeLogin() {
+	var callee models.CalleeUser
+	json.Unmarshal(u.Ctx.Input.RequestBody, &callee)
+	ret, err := models.CalleeLogin(callee.Id, callee.Password)
+
+	res := &response{}
+
+	if err != nil || ret != 0 {
+		res.Status = "Fail"
+		res.Info = err.Error()
+	} else {
+		res.Status = "Success"
+		res.Info = "success"
+	}
+	u.Data["json"] = res
+	u.ServeJSON()
+}
+
+// @Title caller login
+// @Description Logs user into the system
+// @Param	username		query 	string	true		"The username for login"
+// @Param	password		query 	string	true		"The password for login"
+// @Success 200 {string} login success
+// @Failure 403 user not exist
+// @router /caller_login [post]
+func (u *UserController) CallerLogin() {
+	var caller models.CallerUser
+	err := json.Unmarshal(u.Ctx.Input.RequestBody, &caller)
+
+	fmt.Printf("%+v\n", caller)
+	if err == nil {
+		uid, err := models.AddCallerUser(&caller)
+		if err == nil {
+			res := &response{Status: "success", Info: strconv.Itoa(uid)}
+			u.Data["json"] = res
+			fmt.Printf("%d\n", uid)
+			u.ServeJSON()
+			return
+		}
+	}
+	u_return_error(u, err)
 }
