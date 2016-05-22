@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/sunjun/videoapi/controllers"
 	_ "github.com/sunjun/videoapi/docs"
 	"github.com/sunjun/videoapi/models"
 	_ "github.com/sunjun/videoapi/routers"
@@ -14,5 +15,7 @@ func main() {
 		beego.BConfig.WebConfig.StaticDir["/swagger"] = "swagger"
 	}
 	models.InitDB()
+	controllers.InitServerQueue()
+	controllers.InitClientQueue()
 	beego.Run()
 }

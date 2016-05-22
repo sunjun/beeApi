@@ -146,4 +146,32 @@ func init() {
 			[]string{"post"},
 			nil})
 
+	beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"] = append(beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"],
+		beego.ControllerComments{
+			"CallerCreateLine",
+			`/caller_create_line`,
+			[]string{"post"},
+			nil})
+
+	beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"] = append(beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"],
+		beego.ControllerComments{
+			"CallerGetLineStatus",
+			`/caller_get_line_status`,
+			[]string{"post"},
+			nil})
+
+	beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"] = append(beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"],
+		beego.ControllerComments{
+			"CalleeGetUserCallList",
+			`/callee_get_user_call_list`,
+			[]string{"post"},
+			nil})
+
+	beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"] = append(beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"],
+		beego.ControllerComments{
+			"CalleeConnectCaller",
+			`/callee_connect_caller`,
+			[]string{"post"},
+			nil})
+
 }

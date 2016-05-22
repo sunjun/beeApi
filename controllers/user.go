@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/sunjun/videoapi/models"
 
@@ -12,13 +14,107 @@ import (
 
 //response json
 type response struct {
-	Status string `json:"status"`
-	Info   string `json:"info"`
+	Status string        `json:"status"`
+	Info   string        `json:"info"`
+	Url    string        `json:"url"`
+	List   []*clientLine `json:"list"`
+}
+
+type callerCalleeId struct {
+	CallerId string
+	CalleeId int
 }
 
 // Operations about Users
 type UserController struct {
 	beego.Controller
+}
+
+type serverQueue struct {
+	queueType int
+	name      string
+	free      int
+	busy      int
+	lines     []*serverLine
+}
+
+type serverLine struct {
+	isBusy   bool
+	lineURL  string
+	callerID string
+	calleeID int
+}
+
+type clientQueue struct {
+	queueType int
+	name      string
+	free      int
+	wait      int
+	lines     []*clientLine
+}
+
+type clientLine struct {
+	isWait     bool      `json:"is_wait"`
+	lineURL    string    `json:"line_url"`
+	callerID   string    `json:"caller_id"`
+	calleeID   int       `json:"callee_id"`
+	createTime time.Time `json:"create_time"`
+}
+
+var serverQueues []*serverQueue
+var clientQueues []*clientQueue
+
+func InitServerQueue() {
+	serverQueues = make([]*serverQueue, 100)
+	services, _, err := models.GetAllServices()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	for _, s := range services {
+		sQueue := &serverQueue{queueType: s.Id, name: s.Name}
+		serverQueues = append(serverQueues, sQueue)
+	}
+
+	for v := range serverQueues {
+		if serverQueues[v] != nil {
+			fmt.Println(serverQueues[v])
+		}
+	}
+}
+
+func InitClientQueue() {
+	clientQueues = make([]*clientQueue, 100)
+	services, _, err := models.GetAllServices()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	for _, s := range services {
+		cQueue := &clientQueue{queueType: s.Id, name: s.Name}
+		clientQueues = append(clientQueues, cQueue)
+	}
+
+	for v := range clientQueues {
+		if clientQueues[v] != nil {
+			fmt.Println(clientQueues[v])
+		}
+	}
+}
+
+func calleeCreateLine(id int, serviceType int) {
+	for v := range serverQueues {
+		if sQueue := serverQueues[v]; sQueue != nil {
+			if sQueue.queueType == serviceType {
+				sQueue.free++
+				sLine := &serverLine{isBusy: false, lineURL: "/chat.html", calleeID: id}
+				sQueue.lines = append(sQueue.lines, sLine)
+				break
+			}
+		}
+	}
 }
 
 func u_return_error(u *UserController, err error) {
@@ -147,12 +243,13 @@ func (u *UserController) CalleeLogin() {
 
 	res := &response{}
 
-	if err != nil || ret != 0 {
+	if err != nil || ret <= 0 {
 		res.Status = "Fail"
 		res.Info = err.Error()
 	} else {
 		res.Status = "Success"
 		res.Info = "success"
+		calleeCreateLine(callee.Id, ret)
 	}
 	u.Data["json"] = res
 	u.ServeJSON()
@@ -179,6 +276,245 @@ func (u *UserController) CallerLogin() {
 			u.ServeJSON()
 			return
 		}
+	}
+	u_return_error(u, err)
+}
+
+// @Title caller create line
+// @Description Logs user into the system
+// @Param	username		query 	string	true		"The username for login"
+// @Param	password		query 	string	true		"The password for login"
+// @Success 200 {string} login success
+// @Failure 403 user not exist
+// @router /caller_create_line [post]
+func (u *UserController) CallerCreateLine() {
+	var callerLine models.CallerLine
+	err := json.Unmarshal(u.Ctx.Input.RequestBody, &callerLine)
+	var waitNumber int
+
+	if err == nil {
+		for v := range clientQueues {
+			if cQueue := clientQueues[v]; cQueue != nil {
+				if cQueue.queueType == callerLine.LineId {
+					waitNumber = cQueue.wait
+					cQueue.wait++
+					cLine := &clientLine{isWait: true, callerID: callerLine.IdNumber, createTime: time.Now()}
+					cQueue.lines = append(cQueue.lines, cLine)
+					break
+				}
+			}
+		}
+		var info string
+		if waitNumber > 0 {
+			info = fmt.Sprintf("前面有%d用户在等待", waitNumber)
+		} else {
+			info = "请等待客服人员接通"
+		}
+		res := &response{Status: "success", Info: info}
+		u.Data["json"] = res
+		u.ServeJSON()
+		return
+	}
+	u_return_error(u, err)
+}
+
+func getClientLine(callerLine *models.CallerLine, cQueue *clientQueue) (cLine *clientLine) {
+	cLines := cQueue.lines
+	for i := range cLines {
+		if cLine := cLines[i]; cLine != nil {
+			if strings.Compare(cLine.callerID, callerLine.IdNumber) == 0 {
+				return cLine
+			}
+		}
+	}
+
+	return nil
+}
+
+// @Title caller get line status
+// @Description Logs user into the system
+// @Param	username		query 	string	true		"The username for login"
+// @Param	password		query 	string	true		"The password for login"
+// @Success 200 {string} login success
+// @Failure 403 user not exist
+// @router /caller_get_line_status [post]
+func (u *UserController) CallerGetLineStatus() {
+	var callerLine models.CallerLine
+	err := json.Unmarshal(u.Ctx.Input.RequestBody, &callerLine)
+	var cLine *clientLine
+	var waitNumber int
+	res := &response{}
+	if err == nil {
+		for v := range clientQueues {
+			if cQueue := clientQueues[v]; cQueue != nil {
+				if cQueue.queueType == callerLine.LineId {
+					waitNumber = cQueue.wait
+					cLine = getClientLine(&callerLine, cQueue)
+					break
+				}
+			}
+		}
+		if cLine != nil {
+			var info string
+			if cLine.isWait {
+				if waitNumber > 0 {
+					info = fmt.Sprintf("前面有%d用户在等待", waitNumber)
+				} else {
+					info = "请等待客服人员接通"
+				}
+			} else {
+				info = "正在接通，请稍后"
+				res.Url = cLine.lineURL
+			}
+			res.Status = "success"
+			res.Info = info
+			u.Data["json"] = res
+			u.ServeJSON()
+			return
+		}
+	}
+	u_return_error(u, err)
+}
+
+func getClientWaitLines(cQueue *clientQueue) []*clientLine {
+	aLines := cQueue.lines
+	var waitLines []*clientLine
+	for v := range aLines {
+		if cLine := aLines[v]; cLine != nil && cLine.isWait {
+			waitLines = append(waitLines, cLine)
+		}
+	}
+
+	return waitLines
+}
+
+func getCallerQueue(serviceType int) *clientQueue {
+	for v := range clientQueues {
+		if cQueue := clientQueues[v]; cQueue != nil {
+			if cQueue.queueType == serviceType {
+				return cQueue
+			}
+		}
+	}
+	return nil
+}
+
+func getCalleeQueue(serviceType int) *serverQueue {
+	for v := range serverQueues {
+		if sQueue := serverQueues[v]; sQueue != nil {
+			if sQueue.queueType == serviceType {
+				return sQueue
+			}
+		}
+	}
+	return nil
+}
+
+func getCallerLine(callerId string, serviceType int) *clientLine {
+	for v := range clientQueues {
+		if cQueue := clientQueues[v]; cQueue != nil {
+			if cQueue.queueType == serviceType {
+				cLines := cQueue.lines
+				for i := range cLines {
+					if cLine := cLines[i]; cLine != nil {
+						if strings.Compare(callerId, cLine.callerID) == 0 {
+							return cLine
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func getCalleeLine(calleeId int, serviceType int) *serverLine {
+	for v := range serverQueues {
+		if sQueue := serverQueues[v]; sQueue != nil {
+			if sQueue.queueType == serviceType {
+				sLines := sQueue.lines
+				for i := range sLines {
+					if sLine := sLines[i]; sLine != nil {
+						if sLine.calleeID == calleeId {
+							return sLine
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func getCalleeServiceType(calleeId int) int {
+	return 1
+}
+
+// @Title callee get user call list
+// @Description Logs user into the system
+// @Param	username		query 	string	true		"The username for login"
+// @Param	password		query 	string	true		"The password for login"
+// @Success 200 {string} login success
+// @Failure 403 user not exist
+// @router /callee_get_user_call_list [post]
+func (u *UserController) CalleeGetUserCallList() {
+	var calleeUser models.CalleeUser
+	err := json.Unmarshal(u.Ctx.Input.RequestBody, &calleeUser)
+	res := &response{}
+	var waitLines []*clientLine
+	if err == nil {
+		serviceType := getCalleeServiceType(calleeUser.Id)
+		for v := range clientQueues {
+			if cQueue := clientQueues[v]; cQueue != nil {
+				if cQueue.queueType == serviceType {
+					waitLines = getClientWaitLines(cQueue)
+					break
+				}
+			}
+		}
+		res.Status = "success"
+		res.Info = "success"
+		res.List = waitLines
+		u.Data["json"] = res
+		u.ServeJSON()
+		return
+	}
+	u_return_error(u, err)
+}
+
+// @Title callee connect caller
+// @Description Logs user into the system
+// @Param	username		query 	string	true		"The username for login"
+// @Param	password		query 	string	true		"The password for login"
+// @Success 200 {string} login success
+// @Failure 403 user not exist
+// @router /callee_connect_caller [post]
+func (u *UserController) CalleeConnectCaller() {
+	var id callerCalleeId
+	err := json.Unmarshal(u.Ctx.Input.RequestBody, &id)
+	res := &response{}
+	if err == nil {
+		serviceType := getCalleeServiceType(id.CalleeId)
+		sLine := getCalleeLine(id.CalleeId, serviceType)
+		cLine := getCallerLine(id.CallerId, serviceType)
+		sLine.callerID = id.CallerId
+		cLine.calleeID = id.CalleeId
+		sLine.lineURL = "/chat1.html"
+		cLine.lineURL = "/chat1.html"
+
+		cLine.isWait = false
+		sLine.isBusy = true
+
+		cQueue := getCallerQueue(serviceType)
+		sQueue := getCalleeQueue(serviceType)
+
+		cQueue.wait--
+		sQueue.busy++
+		res.Status = "success"
+		res.Info = "success"
+		u.Data["json"] = res
+		u.ServeJSON()
+		return
 	}
 	u_return_error(u, err)
 }

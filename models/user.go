@@ -22,6 +22,11 @@ type CallerUser struct {
 	AddTime  time.Time `orm:form:"add_time"`
 }
 
+type CallerLine struct {
+	IdNumber string
+	LineId   int
+}
+
 type CalleeUser struct {
 	Id       int
 	Password string
@@ -109,7 +114,7 @@ func CalleeLogin(id int, password string) (int, error) {
 		return -1, errors.New("用户名密码不正确")
 	}
 
-	return 0, nil
+	return 2, nil
 }
 
 func AddCallerUser(c *CallerUser) (int, error) {
