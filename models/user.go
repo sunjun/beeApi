@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/astaxie/beego/orm"
+	"strings"
 )
 
 var (
@@ -30,6 +31,9 @@ type CallerLine struct {
 type CalleeUser struct {
 	Id       int
 	Password string
+	Name     string
+	Gender   string
+	Service  int
 }
 
 type User struct {
@@ -51,6 +55,7 @@ func init() {
 	u := User{"user_11111", "astaxie", "11111", Profile{"male", 20, "Singapore", "astaxie@gmail.com"}}
 	UserList["user_11111"] = &u
 	orm.RegisterModel(new(CallerUser))
+	orm.RegisterModel(new(CalleeUser))
 }
 
 func AddUser(u User) string {
@@ -108,13 +113,37 @@ func DeleteUser(uid string) {
 	delete(UserList, uid)
 }
 
+func CalleeServiceType(calleeId int) int {
+	o := orm.NewOrm()
+
+	var user CalleeUser
+	err := o.QueryTable("callee_user").Filter("id", calleeId).One(&user)
+
+	if err == orm.ErrNoRows {
+		// No result
+		return 1
+	}
+
+	return int(user.Service)
+}
+
 func CalleeLogin(id int, password string) (int, error) {
-	fmt.Println(id, password)
-	if id != 123 && password != "123456" {
+	o := orm.NewOrm()
+
+	var user CalleeUser
+	err := o.QueryTable("callee_user").Filter("id", id).One(&user)
+
+	fmt.Printf("%d\n", id)
+	if err == orm.ErrNoRows {
+		// No result
+		return -1, errors.New("用户不存在")
+	}
+
+	if strings.Compare(password, user.Password) != 0 {
 		return -1, errors.New("用户名密码不正确")
 	}
 
-	return 1, nil
+	return int(user.Service), nil
 }
 
 func AddCallerUser(c *CallerUser) (int, error) {
