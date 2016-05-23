@@ -1,8 +1,11 @@
 package controllers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -110,6 +113,19 @@ func InitClientQueue() {
 	}
 }
 
+func getClientLine(callerLine *models.CallerLine, cQueue *clientQueue) (cLine *clientLine) {
+	cLines := cQueue.lines
+	for i := range cLines {
+		if cLine := cLines[i]; cLine != nil {
+			if strings.Compare(cLine.CallerID, callerLine.IdNumber) == 0 {
+				return cLine
+			}
+		}
+	}
+
+	return nil
+}
+
 func calleeCreateLine(id int, serviceType int) {
 	if sQueue := getCalleeQueue(serviceType); sQueue != nil {
 		sQueue.free++
@@ -124,6 +140,82 @@ func u_return_error(u *UserController, err error) {
 	u.Data["json"] = res
 	u.ServeJSON()
 	return
+}
+
+func getClientWaitLines(cQueue *clientQueue) []*clientLine {
+	aLines := cQueue.lines
+	var waitLines []*clientLine
+	for v := range aLines {
+		if cLine := aLines[v]; cLine != nil && cLine.IsWait {
+			waitLines = append(waitLines, cLine)
+		}
+	}
+
+	return waitLines
+}
+
+func getCallerQueue(serviceType int) *clientQueue {
+	for v := range clientQueues {
+		if cQueue := clientQueues[v]; cQueue != nil {
+			if cQueue.queueType == serviceType {
+				return cQueue
+			}
+		}
+	}
+	return nil
+}
+
+func getCalleeQueue(serviceType int) *serverQueue {
+	for v := range serverQueues {
+		if sQueue := serverQueues[v]; sQueue != nil {
+			if sQueue.queueType == serviceType {
+				return sQueue
+			}
+		}
+	}
+	return nil
+}
+
+func getCallerLine(callerId string, serviceType int) *clientLine {
+	if cQueue := getCallerQueue(serviceType); cQueue != nil {
+		cLines := cQueue.lines
+		for i := range cLines {
+			if cLine := cLines[i]; cLine != nil {
+				if strings.Compare(callerId, cLine.CallerID) == 0 {
+					return cLine
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func getCalleeLine(calleeId int, serviceType int) *serverLine {
+	if sQueue := getCalleeQueue(serviceType); sQueue != nil {
+		sLines := sQueue.lines
+		for i := range sLines {
+			if sLine := sLines[i]; sLine != nil {
+				if sLine.calleeID == calleeId {
+					return sLine
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func copyWebrtcHtml(time int64) {
+	s1 := "cp /var/nodes/easyrtc/easyrtc/demos/demo_audio_video_simple_hd.html"
+	s := fmt.Sprintf("%s /var/nodes/easyrtc/easyrtc/demos/%d.html", s1, time)
+	cmd := exec.Command("/bin/sh", "-c", s) //调用Command函数
+	var out bytes.Buffer                    //缓冲字节
+
+	cmd.Stdout = &out //标准输出
+	err := cmd.Run()  //运行指令 ，做判断
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s", out.String()) //输出执行结果
 }
 
 // @Title createUser
@@ -318,19 +410,6 @@ func (u *UserController) CallerCreateLine() {
 	u_return_error(u, err)
 }
 
-func getClientLine(callerLine *models.CallerLine, cQueue *clientQueue) (cLine *clientLine) {
-	cLines := cQueue.lines
-	for i := range cLines {
-		if cLine := cLines[i]; cLine != nil {
-			if strings.Compare(cLine.CallerID, callerLine.IdNumber) == 0 {
-				return cLine
-			}
-		}
-	}
-
-	return nil
-}
-
 // @Title caller get line status
 // @Description Logs user into the system
 // @Param	username		query 	string	true		"The username for login"
@@ -369,68 +448,6 @@ func (u *UserController) CallerGetLineStatus() {
 		}
 	}
 	u_return_error(u, err)
-}
-
-func getClientWaitLines(cQueue *clientQueue) []*clientLine {
-	aLines := cQueue.lines
-	var waitLines []*clientLine
-	for v := range aLines {
-		if cLine := aLines[v]; cLine != nil && cLine.IsWait {
-			waitLines = append(waitLines, cLine)
-		}
-	}
-
-	return waitLines
-}
-
-func getCallerQueue(serviceType int) *clientQueue {
-	for v := range clientQueues {
-		if cQueue := clientQueues[v]; cQueue != nil {
-			if cQueue.queueType == serviceType {
-				return cQueue
-			}
-		}
-	}
-	return nil
-}
-
-func getCalleeQueue(serviceType int) *serverQueue {
-	for v := range serverQueues {
-		if sQueue := serverQueues[v]; sQueue != nil {
-			if sQueue.queueType == serviceType {
-				return sQueue
-			}
-		}
-	}
-	return nil
-}
-
-func getCallerLine(callerId string, serviceType int) *clientLine {
-	if cQueue := getCallerQueue(serviceType); cQueue != nil {
-		cLines := cQueue.lines
-		for i := range cLines {
-			if cLine := cLines[i]; cLine != nil {
-				if strings.Compare(callerId, cLine.CallerID) == 0 {
-					return cLine
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func getCalleeLine(calleeId int, serviceType int) *serverLine {
-	if sQueue := getCalleeQueue(serviceType); sQueue != nil {
-		sLines := sQueue.lines
-		for i := range sLines {
-			if sLine := sLines[i]; sLine != nil {
-				if sLine.calleeID == calleeId {
-					return sLine
-				}
-			}
-		}
-	}
-	return nil
 }
 
 // @Title callee get user call list
@@ -486,8 +503,15 @@ func (u *UserController) CalleeConnectCaller() {
 		cLine := getCallerLine(id.CallerId, serviceType)
 		sLine.callerID = id.CallerId
 		cLine.CalleeID = id.CalleeId
-		sLine.lineURL = "/chat1.html"
-		cLine.LineURL = "/chat1.html"
+
+		t := time.Now().UnixNano()
+
+		copyWebrtcHtml(t)
+
+		baseUrl := "http://104.131.156.105:8880/demos/"
+		url := fmt.Sprintf("%s%d.html", baseUrl, t)
+		sLine.lineURL = url
+		cLine.LineURL = url
 
 		cLine.IsWait = false
 		sLine.isBusy = true
