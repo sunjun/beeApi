@@ -114,7 +114,7 @@ func CalleeLogin(id int, password string) (int, error) {
 		return -1, errors.New("用户名密码不正确")
 	}
 
-	return 2, nil
+	return 1, nil
 }
 
 func AddCallerUser(c *CallerUser) (int, error) {

@@ -20,6 +20,12 @@ type response struct {
 	List   []*clientLine `json:"list"`
 }
 
+type l_response struct {
+	Status string        `json:"status"`
+	Info   string        `json:"info"`
+	List   []*clientLine `json:"list"`
+}
+
 type callerCalleeId struct {
 	CallerId string
 	CalleeId int
@@ -54,11 +60,11 @@ type clientQueue struct {
 }
 
 type clientLine struct {
-	isWait     bool      `json:"is_wait"`
-	lineURL    string    `json:"line_url"`
-	callerID   string    `json:"caller_id"`
-	calleeID   int       `json:"callee_id"`
-	createTime time.Time `json:"create_time"`
+	IsWait     bool   `json:"is_wait"`
+	LineURL    string `json:"line_url"`
+	CallerID   string `json:"caller_id"`
+	CalleeID   int    `json:"callee_id"`
+	CreateTime int64  `json:"create_time"`
 }
 
 var serverQueues []*serverQueue
@@ -111,6 +117,7 @@ func calleeCreateLine(id int, serviceType int) {
 				sQueue.free++
 				sLine := &serverLine{isBusy: false, lineURL: "/chat.html", calleeID: id}
 				sQueue.lines = append(sQueue.lines, sLine)
+				fmt.Printf("%+v\n", sQueue.lines)
 				break
 			}
 		}
@@ -292,14 +299,17 @@ func (u *UserController) CallerCreateLine() {
 	err := json.Unmarshal(u.Ctx.Input.RequestBody, &callerLine)
 	var waitNumber int
 
+	fmt.Printf("%+v\n", callerLine)
 	if err == nil {
 		for v := range clientQueues {
 			if cQueue := clientQueues[v]; cQueue != nil {
 				if cQueue.queueType == callerLine.LineId {
 					waitNumber = cQueue.wait
 					cQueue.wait++
-					cLine := &clientLine{isWait: true, callerID: callerLine.IdNumber, createTime: time.Now()}
+					cLine := &clientLine{IsWait: true, CallerID: callerLine.IdNumber, CreateTime: time.Now().UnixNano()}
 					cQueue.lines = append(cQueue.lines, cLine)
+					fmt.Printf("%+v\n", cLine)
+					fmt.Printf("%+v\n", cQueue.lines)
 					break
 				}
 			}
@@ -322,7 +332,7 @@ func getClientLine(callerLine *models.CallerLine, cQueue *clientQueue) (cLine *c
 	cLines := cQueue.lines
 	for i := range cLines {
 		if cLine := cLines[i]; cLine != nil {
-			if strings.Compare(cLine.callerID, callerLine.IdNumber) == 0 {
+			if strings.Compare(cLine.CallerID, callerLine.IdNumber) == 0 {
 				return cLine
 			}
 		}
@@ -356,7 +366,7 @@ func (u *UserController) CallerGetLineStatus() {
 		}
 		if cLine != nil {
 			var info string
-			if cLine.isWait {
+			if cLine.IsWait {
 				if waitNumber > 0 {
 					info = fmt.Sprintf("前面有%d用户在等待", waitNumber)
 				} else {
@@ -364,7 +374,7 @@ func (u *UserController) CallerGetLineStatus() {
 				}
 			} else {
 				info = "正在接通，请稍后"
-				res.Url = cLine.lineURL
+				res.Url = cLine.LineURL
 			}
 			res.Status = "success"
 			res.Info = info
@@ -380,7 +390,7 @@ func getClientWaitLines(cQueue *clientQueue) []*clientLine {
 	aLines := cQueue.lines
 	var waitLines []*clientLine
 	for v := range aLines {
-		if cLine := aLines[v]; cLine != nil && cLine.isWait {
+		if cLine := aLines[v]; cLine != nil && cLine.IsWait {
 			waitLines = append(waitLines, cLine)
 		}
 	}
@@ -417,7 +427,7 @@ func getCallerLine(callerId string, serviceType int) *clientLine {
 				cLines := cQueue.lines
 				for i := range cLines {
 					if cLine := cLines[i]; cLine != nil {
-						if strings.Compare(callerId, cLine.callerID) == 0 {
+						if strings.Compare(callerId, cLine.CallerID) == 0 {
 							return cLine
 						}
 					}
@@ -429,12 +439,16 @@ func getCallerLine(callerId string, serviceType int) *clientLine {
 }
 
 func getCalleeLine(calleeId int, serviceType int) *serverLine {
+	fmt.Printf("%d %d\n", calleeId, serviceType)
 	for v := range serverQueues {
 		if sQueue := serverQueues[v]; sQueue != nil {
+			fmt.Printf("%+v \n", sQueue)
 			if sQueue.queueType == serviceType {
+				fmt.Printf("%+v \n", sQueue)
 				sLines := sQueue.lines
 				for i := range sLines {
 					if sLine := sLines[i]; sLine != nil {
+						fmt.Printf("%+v %d\n", sLine, calleeId)
 						if sLine.calleeID == calleeId {
 							return sLine
 						}
@@ -460,7 +474,8 @@ func getCalleeServiceType(calleeId int) int {
 func (u *UserController) CalleeGetUserCallList() {
 	var calleeUser models.CalleeUser
 	err := json.Unmarshal(u.Ctx.Input.RequestBody, &calleeUser)
-	res := &response{}
+	fmt.Printf("%+v\n", calleeUser)
+	res := &l_response{}
 	var waitLines []*clientLine
 	if err == nil {
 		serviceType := getCalleeServiceType(calleeUser.Id)
@@ -474,7 +489,14 @@ func (u *UserController) CalleeGetUserCallList() {
 		}
 		res.Status = "success"
 		res.Info = "success"
+		fmt.Printf("%+v\n", waitLines)
 		res.List = waitLines
+
+		for v := range res.List {
+			if c := res.List[v]; c != nil {
+				fmt.Printf("%+v\n", c)
+			}
+		}
 		u.Data["json"] = res
 		u.ServeJSON()
 		return
@@ -492,26 +514,30 @@ func (u *UserController) CalleeGetUserCallList() {
 func (u *UserController) CalleeConnectCaller() {
 	var id callerCalleeId
 	err := json.Unmarshal(u.Ctx.Input.RequestBody, &id)
+	fmt.Printf("%+v\n", id)
 	res := &response{}
 	if err == nil {
 		serviceType := getCalleeServiceType(id.CalleeId)
 		sLine := getCalleeLine(id.CalleeId, serviceType)
 		cLine := getCallerLine(id.CallerId, serviceType)
 		sLine.callerID = id.CallerId
-		cLine.calleeID = id.CalleeId
+		cLine.CalleeID = id.CalleeId
 		sLine.lineURL = "/chat1.html"
-		cLine.lineURL = "/chat1.html"
+		cLine.LineURL = "/chat1.html"
 
-		cLine.isWait = false
+		cLine.IsWait = false
 		sLine.isBusy = true
 
 		cQueue := getCallerQueue(serviceType)
 		sQueue := getCalleeQueue(serviceType)
 
+		fmt.Printf("%+v\n", cLine)
+		fmt.Printf("%+v\n", sLine)
 		cQueue.wait--
 		sQueue.busy++
 		res.Status = "success"
 		res.Info = "success"
+		res.Url = sLine.lineURL
 		u.Data["json"] = res
 		u.ServeJSON()
 		return
