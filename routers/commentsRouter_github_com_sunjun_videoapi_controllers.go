@@ -134,6 +134,20 @@ func init() {
 
 	beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"] = append(beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"],
 		beego.ControllerComments{
+			"CalleeLogout",
+			`/callee_logout`,
+			[]string{"post"},
+			nil})
+
+	beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"] = append(beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"],
+		beego.ControllerComments{
+			"CallerLogout",
+			`/caller_logout`,
+			[]string{"post"},
+			nil})
+
+	beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"] = append(beego.GlobalControllerRouter["github.com/sunjun/videoapi/controllers:UserController"],
+		beego.ControllerComments{
 			"CalleeLogin",
 			`/callee_login`,
 			[]string{"post"},

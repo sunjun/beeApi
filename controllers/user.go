@@ -29,6 +29,11 @@ type l_response struct {
 	List   []*clientLine `json:"list"`
 }
 
+type callerLogout struct {
+	Id     string
+	LineId int
+}
+
 type callerCalleeId struct {
 	CallerId string
 	CalleeId int
@@ -176,6 +181,38 @@ func getCalleeQueue(serviceType int) *serverQueue {
 	return nil
 }
 
+func removeCallerLine(callerId string, serviceType int) {
+	if cQueue := getCallerQueue(serviceType); cQueue != nil {
+		cLines := cQueue.lines
+		for i := range cLines {
+			if cLine := cLines[i]; cLine != nil {
+				if strings.Compare(callerId, cLine.CallerID) == 0 {
+					cLine = cLines[len(cLines)-1]
+					cLines[len(cLines)-1] = nil
+					cLines = cLines[:len(cLines)-1]
+					return
+				}
+			}
+		}
+	}
+}
+
+func removeCalleeLine(calleeId int, serviceType int) {
+	if sQueue := getCalleeQueue(serviceType); sQueue != nil {
+		sLines := sQueue.lines
+		for i := range sLines {
+			if sLine := sLines[i]; sLine != nil {
+				if sLine.calleeID == calleeId {
+					sLine = sLines[len(sLines)-1]
+					sLines[len(sLines)-1] = nil
+					sLines = sLines[:len(sLines)-1]
+					return
+				}
+			}
+		}
+	}
+}
+
 func getCallerLine(callerId string, serviceType int) *clientLine {
 	if cQueue := getCallerQueue(serviceType); cQueue != nil {
 		cLines := cQueue.lines
@@ -320,6 +357,58 @@ func (u *UserController) Login() {
 // @router /logout [get]
 func (u *UserController) Logout() {
 	u.Data["json"] = "logout success"
+	u.ServeJSON()
+}
+
+// @Title callee logout
+// @Description Logs user into the system
+// @Param	username		query 	string	true		"The username for login"
+// @Param	password		query 	string	true		"The password for login"
+// @Success 200 {string} login success
+// @Failure 403 user not exist
+// @router /callee_logout [post]
+func (u *UserController) CalleeLogout() {
+	var callee models.CalleeUser
+	err := json.Unmarshal(u.Ctx.Input.RequestBody, &callee)
+	serviceType := models.CalleeServiceType(callee.Id)
+	res := &response{}
+
+	if err != nil || serviceType <= 0 {
+		res.Status = "Fail"
+		res.Info = err.Error()
+	} else {
+		res.Status = "Success"
+		res.Info = "success"
+		removeCalleeLine(callee.Id, serviceType)
+	}
+	u.Data["json"] = res
+	u.ServeJSON()
+}
+
+// @Title caller logout
+// @Description Logs user into the system
+// @Param	username		query 	string	true		"The username for login"
+// @Param	password		query 	string	true		"The password for login"
+// @Success 200 {string} login success
+// @Failure 403 user not exist
+// @router /caller_logout [post]
+func (u *UserController) CallerLogout() {
+	var caller callerLogout
+	err := json.Unmarshal(u.Ctx.Input.RequestBody, &caller)
+
+	serviceType := caller.LineId
+
+	res := &response{}
+
+	if err != nil || serviceType <= 0 {
+		res.Status = "Fail"
+		res.Info = err.Error()
+	} else {
+		res.Status = "Success"
+		res.Info = "success"
+		removeCallerLine(caller.Id, serviceType)
+	}
+	u.Data["json"] = res
 	u.ServeJSON()
 }
 
